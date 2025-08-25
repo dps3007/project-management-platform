@@ -1,0 +1,22 @@
+{
+  "name": "projectmanagement",
+  "version": "1.0.0",
+  "description": "A Project Management Platform",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch index.js"
+  },
+  "keywords": [
+    "project",
+    "management",
+    "trello",
+    "basecamp",
+    "task"
+  ],
+  "author": "Deepanshu Pal <deepanshupal30072002@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}
