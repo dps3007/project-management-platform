@@ -1,6 +1,6 @@
-import ApiResponse from "../utils/api-response.js";
+import ApiResponse from "../utils/apiResponse.js";
 
-import { asyncHandler } from "../utils/async-handler.js";
+import {asyncHandler} from "../utils/asyncHandler.js";
 
 export const healthCheck = asyncHandler(async (req, res) => {
     const response = new ApiResponse(200, { status: "OK" }, "Health check passed");
