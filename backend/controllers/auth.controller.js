@@ -29,7 +29,8 @@ export const registerUser = asyncHandler(async (req, res) => {
     // 1. Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-        throw new ApiError("User already exists", 409);
+        throw new ApiError(409, "User already exists");
+
     }
 
     // 2. Create new user
@@ -59,16 +60,17 @@ export const registerUser = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         await User.findByIdAndDelete(user._id);
-        throw new ApiError("Failed to send verification email", 500);
+        throw new ApiError(500, "Failed to send verification email");
     }
 
     // 5. Response
-    return ApiResponse.success(res, "User registered successfully", {
-        user: {
-            id: user._id,
-            email: user.email,
-            username: user.username,
-        },
-        emailVerificationSent: true,
-    });
+    const createdUser = await User.findById(user._id).select('-password -refreshToken -emailVerificationToken -emailVerificationTokenExpiry',);
+
+    if (!createdUser) {
+        throw new ApiError(500, "User registration failed");
+    }
+    return res
+  .status(201)
+  .json(new ApiResponse(201, {user: createdUser}, "User registered successfully"));
+
 });
