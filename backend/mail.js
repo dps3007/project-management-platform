@@ -1,4 +1,43 @@
 import Mailgen from "mailgen";
+import nodemailer from "nodemailer";
+
+export const sendEmail = async (options) => {
+    const mailGenerator = new Mailgen({
+        theme: "default",
+        product: {
+            name: "Project Management",
+            link: "http://localhost:3000"
+        }
+    });
+
+    const emailHtml = mailGenerator.generate(options.mailgenContent);
+
+    const emailTextual = mailGenerator.generatePlaintext(options.mailgenContent);
+
+    const transporter = nodemailer.createTransport({
+        host: process.env.MAILTRAP_HOST,
+        port: process.env.MAILTRAP_PORT,
+        auth: {
+            user: process.env.MAILTRAP_USER,
+            pass: process.env.MAILTRAP_PASS
+        }
+    });
+
+    const mail = {
+        from: process.env.MAIL_FROM,
+        to: options.email,
+        subject: options.subject,
+        text: emailTextual,
+        html: emailHtml
+    };
+
+    try {
+        await transporter.sendMail(mail);
+        console.log("Email sent successfully");
+    } catch (error) {
+        console.error("Error sending email:", error);
+    }
+};
 
 
 export const emailVerificationMailgenContent = (username, verificationUrl) => {
