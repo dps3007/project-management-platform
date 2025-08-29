@@ -58,6 +58,7 @@ const userSchema = new Schema({
 {timestamps: true}
 );
 
+// hash password with pre hook
 userSchema.pre("save", async function (next) {
     if (this.isModified("password")) {
         // Hash the password before saving
@@ -65,5 +66,10 @@ userSchema.pre("save", async function (next) {
     }
     next();
 });
+
+//methods
+userSchema.methods.isPasswordMatch = async function (password) {
+    return await brcypt.compare(password, this.password);
+};
 
 export const User = mongoose.model('User', userSchema);
