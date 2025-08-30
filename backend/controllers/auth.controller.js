@@ -74,3 +74,50 @@ export const registerUser = asyncHandler(async (req, res) => {
   .json(new ApiResponse(201, {user: createdUser}, "User registered successfully"));
 
 });
+
+export const loginUser = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    // 1. Validate input
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
+    }
+
+    // 2. Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new ApiError(401, "Invalid credentials");
+    }
+
+    // 3. Validate password
+    const isPasswordValid = await user.isPasswordMatch(password);
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid credentials");
+    }
+
+    // 4. Generate tokens
+    const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id);
+
+    // 5. Fetch user without sensitive fields
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken -emailVerificationToken -emailVerificationTokenExpiry"
+    );
+
+    if (!loggedInUser) {
+        throw new ApiError(500, "User login failed");
+    }
+
+    // 6. Cookie options
+    const options = {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+
+    // 7. Response
+    return res.status(200)
+        .cookie("refreshToken", refreshToken, options)
+        .cookie("accessToken", accessToken, options)
+        .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User logged in successfully"));
+});

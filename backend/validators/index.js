@@ -1,6 +1,6 @@
 import { body } from "express-validator";
 
-const userRegistrationValidation = () => {
+export const userRegistrationValidation = () => {
   return [
     body("username")
       .trim()
@@ -33,6 +33,20 @@ const userRegistrationValidation = () => {
     .trim()
     .isLength({ min: 2 }).withMessage("Full name must be at least 2 characters").bail()
     .matches(/^[a-zA-Z\s]+$/).withMessage("Full name must only contain letters and spaces"),
-]};
+  ];
+};
 
-export default userRegistrationValidation;
+export const userLoginValidation = () => {
+  return [
+    body("email")
+      .trim()
+      .notEmpty().withMessage("Email is required").bail()
+      .isEmail().withMessage("Invalid email address")
+      .normalizeEmail(),
+
+    body("password")
+      .trim()
+      .notEmpty().withMessage("Password is required").bail()
+      .isLength({ min: 6 }).withMessage("Password must be at least 6 characters").bail()
+  ];
+};
