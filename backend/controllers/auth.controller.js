@@ -123,9 +123,23 @@ export const loginUser = asyncHandler(async (req, res) => {
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
-    // Clear cookies
-    res.clearCookie("refreshToken");
-    res.clearCookie("accessToken");
+    // Remove refreshToken from DB (optional but recommended)
+    if (req.user?._id) {
+        await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } });
+    }
 
-    return res.status(200).json(new ApiResponse(200, null, "User logged out successfully"));
+    // Options must match cookies set during login
+    const options = {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+    };
+
+    // Clear cookies
+    res.clearCookie("refreshToken", options);
+    res.clearCookie("accessToken", options);
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, null, "User logged out successfully"));
 });
