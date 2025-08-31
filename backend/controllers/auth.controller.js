@@ -4,6 +4,7 @@ import ApiError from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { emailVerificationMailgenContent, sendEmail } from "../utils/mail.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 
 
@@ -281,39 +282,187 @@ export const refreshToken = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Refresh token is required");
   }
 
-  let decoded;
-  try {
-    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-  } catch (error) {
-    throw new ApiError(401, "Invalid or expired refresh token");
+  // Verify
+  const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+  if (!decoded) {
+    throw new ApiError(401, "Invalid refresh token");
   }
 
-  // Find the user
-  const user = await User.findById(decoded.id);
+  // Find user whose refreshTokens array contains this token
+  const user = await User.findOne({ 
+    _id: decoded.id, 
+    refreshTokens: refreshToken 
+  });
+
   if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  // Check if refresh token exists in user's stored tokens
-  if (!user.refreshTokens.includes(refreshToken)) {
-    throw new ApiError(401, "Refresh token is not valid (possibly revoked)");
+    throw new ApiError(404, "User not found or token not valid");
   }
 
   // Generate new tokens
-  const newAccessToken = user.generateAccessToken(); // expires in e.g., 15m
-  const newRefreshToken = user.generateRefreshToken(); // expires in e.g., 7d
+  const newAccessToken = user.generateAccessToken();
+  const newRefreshToken = user.generateRefreshToken();
 
-  // Rotate tokens: remove old, add new
-  user.refreshTokens = user.refreshTokens.filter((t) => t !== refreshToken);
+  // Replace old refreshToken with new one
+  user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
   user.refreshTokens.push(newRefreshToken);
   await user.save();
 
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      { accessToken: newAccessToken, refreshToken: newRefreshToken },
-      "Tokens refreshed successfully"
-    )
+    new ApiResponse(200, { accessToken: newAccessToken, refreshToken: newRefreshToken }, "Tokens refreshed successfully")
   );
 });
 
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Generate password reset token
+  const resetToken = user.generatePasswordResetToken(); // 👈 custom method banaoge
+  user.passwordResetToken = resetToken;
+  user.passwordResetTokenExpiry = Date.now() + 3600000; // 1 hour
+  await user.save();
+
+  // Send email
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${user.email}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Password Reset",
+    html: `<p>Please reset your password by clicking the link below:</p>
+           <a href="${resetUrl}">${resetUrl}</a>`
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Password reset email sent successfully")
+  );
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, email, newPassword } = req.body;
+
+  if (!token || !email || !newPassword) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const user = await User.findOne({
+    email: email.toLowerCase(),
+    passwordResetToken: token,
+    passwordResetTokenExpiry: { $gt: Date.now() } // token abhi valid hai?
+  });
+
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired reset token");
+  }
+
+  // Update password
+  user.password = newPassword;
+  user.passwordResetToken = null;
+  user.passwordResetTokenExpiry = null;
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Password reset successful")
+  );
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // ✅ Check if old password matches
+  const isMatch = await user.isPasswordMatch(oldPassword);
+  if (!isMatch) {
+    throw new ApiError(401, "Old password is incorrect");
+  }
+
+  // ✅ Extra: Prevent using same password again
+  const isSame = await user.isPasswordMatch(newPassword);
+  if (isSame) {
+    throw new ApiError(400, "New password cannot be the same as old password");
+  }
+
+  // ✅ Update password
+  user.password = newPassword;
+
+  // ✅ Invalidate all refresh tokens (force re-login on all devices)
+  user.refreshTokens = [];
+
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Password changed successfully, please log in again")
+  );
+});
+
+export const logoutAllDevices = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  user.refreshTokens = []; // ✅ Clear all refresh tokens
+  await user.save();
+
+  // Clear cookies
+  const options = { httpOnly: true, secure: true, sameSite: "strict" };
+  res.clearCookie("refreshToken", options);
+  res.clearCookie("accessToken", options);
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Logged out from all devices successfully")
+  );
+});
+
+export const updateAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Avatar file is required");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  // Example: save to Cloudinary or local storage
+  user.avatar = {
+    url: `/uploads/${req.file.filename}`, 
+    localPath: req.file.path
+  };
+
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, { avatar: user.avatar }, "Avatar updated successfully")
+  );
+});
+
+export const deactivateAccount = asyncHandler(async (req, res) => {
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { isActive: false },
+    { new: true }
+  );
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Account deactivated successfully")
+  );
+});

@@ -25,7 +25,8 @@ const userSchema = new Schema({
     },
     username: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     password: {
         type: String,
@@ -35,15 +36,15 @@ const userSchema = new Schema({
         type: Boolean,
         default: false
     },
-    refreshToken: {
+    refreshTokens: {
+        type: [String],
+        default: []
+    },
+    passwordResetToken: {
         type: String,
         default: null
     },
-    forgetPasswordToken: {
-        type: String,
-        default: null
-    },
-    forgetPasswordTokenExpiry: {
+    passwordResetTokenExpiry: {
         type: Date,
         default: null
     },
@@ -55,10 +56,14 @@ const userSchema = new Schema({
         type: Date,
         default: null
     },
+    role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
+  },
 
-}, 
-{timestamps: true}
-);
+}, { timestamps: true });
+
 
 // hash password with pre hook
 userSchema.pre("save", async function (next) {
