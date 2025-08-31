@@ -3,6 +3,8 @@ import  ApiResponse  from "../utils/apiResponse.js";
 import ApiError from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { emailVerificationMailgenContent, sendEmail } from "../utils/mail.js";
+import jwt from "jsonwebtoken";
+
 
 
 export const generateAccessTokenAndRefreshToken = async (userId) => {
@@ -147,5 +149,171 @@ export const logoutUser = asyncHandler(async (req, res) => {
 export const getCurrentUser = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, { user: req.user }, "Current user fetched successfully"));
+});
+
+export const updateCurrentUser = asyncHandler(async (req, res) => {
+  const { username, email } = req.body;
+
+  if (!username && !email) {
+    throw new ApiError(400, "Please provide new username or email");
+  }
+
+  // Dynamically create update object
+  const updateFields = {};
+  if (username) updateFields.username = username;
+  if (email) updateFields.email = email;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updateFields },
+    { new: true, runValidators: true }
+  ).select("-password"); // password ko exclude karna acha practice hai
+
+  if (!updatedUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { user: updatedUser }, "User updated successfully"));
+});
+
+export const deleteCurrentUser = asyncHandler(async (req, res) => {
+  const deletedUser = await User.findByIdAndDelete(req.user._id);
+
+  if (!deletedUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res
+    .status(200) // safer than 204 if sending body
+    .json(new ApiResponse(200, null, "User deleted successfully"));
+});
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { email, verificationToken } = req.body;
+
+  if (!email || !verificationToken) {
+    throw new ApiError(400, "Email and verification token are required");
+  }
+
+  const user = await User.findOne({
+    email: email.toLowerCase(),
+    emailVerificationToken: verificationToken
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found or invalid token");
+  }
+
+  // check expiry
+  if (user.emailVerificationTokenExpiry && user.emailVerificationTokenExpiry < Date.now()) {
+    throw new ApiError(400, "Verification token has expired");
+  }
+
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationTokenExpiry = undefined;
+
+  await user.save();
+
+  // return safe data only
+  const safeUser = {
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    emailVerified: user.emailVerified
+  };
+
+  return res.status(200).json(
+    new ApiResponse(200, { user: safeUser }, "Email verified successfully")
+  );
+});
+
+export const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Already verified?
+  if (user.emailVerified) {
+    throw new ApiError(400, "Email is already verified");
+  }
+
+  // Optional: Check cooldown (e.g., 1 min gap)
+  if (user.lastVerificationEmailSentAt && Date.now() - user.lastVerificationEmailSentAt < 60 * 1000) {
+    throw new ApiError(429, "Please wait before requesting another verification email");
+  }
+
+  // Generate new verification token
+  const verificationToken = user.generateEmailVerificationToken();
+  user.lastVerificationEmailSentAt = Date.now();
+  await user.save();
+
+  // Send verification email
+  const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${user.email}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Email Verification",
+    text: `Please verify your email by clicking the link: ${verifyUrl}`,
+    html: `<p>Please verify your email by clicking the link below:</p>
+           <a href="${verifyUrl}">${verifyUrl}</a>`
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Verification email resent successfully")
+  );
+});
+
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    throw new ApiError(400, "Refresh token is required");
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+  } catch (error) {
+    throw new ApiError(401, "Invalid or expired refresh token");
+  }
+
+  // Find the user
+  const user = await User.findById(decoded.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Check if refresh token exists in user's stored tokens
+  if (!user.refreshTokens.includes(refreshToken)) {
+    throw new ApiError(401, "Refresh token is not valid (possibly revoked)");
+  }
+
+  // Generate new tokens
+  const newAccessToken = user.generateAccessToken(); // expires in e.g., 15m
+  const newRefreshToken = user.generateRefreshToken(); // expires in e.g., 7d
+
+  // Rotate tokens: remove old, add new
+  user.refreshTokens = user.refreshTokens.filter((t) => t !== refreshToken);
+  user.refreshTokens.push(newRefreshToken);
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { accessToken: newAccessToken, refreshToken: newRefreshToken },
+      "Tokens refreshed successfully"
+    )
+  );
 });
 
