@@ -34,3 +34,11 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
         throw new ApiError(401, "Invalid access token");
     }
 });
+
+// ✅ Only admin allowed
+export const isAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    return next();
+  }
+  throw new ApiError(403, "Access denied: Admins only");
+};

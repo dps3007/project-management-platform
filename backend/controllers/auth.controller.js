@@ -4,7 +4,6 @@ import ApiError from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { emailVerificationMailgenContent, sendEmail } from "../utils/mail.js";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 
 
 
@@ -374,6 +373,63 @@ export const resetPassword = asyncHandler(async (req, res) => {
   );
 });
 
+
+export const logoutAllDevices = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+    
+    user.refreshTokens = []; // ✅ Clear all refresh tokens
+    await user.save();
+
+    // Clear cookies
+    const options = { httpOnly: true, secure: true, sameSite: "strict" };
+    res.clearCookie("refreshToken", options);
+    res.clearCookie("accessToken", options);
+
+  return res.status(200).json(
+    new ApiResponse(200, null, "Logged out from all devices successfully")
+  );
+});
+
+export const updateAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Avatar file is required");
+}
+
+const user = await User.findById(req.user._id);
+if (!user) throw new ApiError(404, "User not found");
+
+// Example: save to Cloudinary or local storage
+user.avatar = {
+    url: `/uploads/${req.file.filename}`, 
+    localPath: req.file.path
+  };
+  
+  await user.save();
+  
+  return res.status(200).json(
+    new ApiResponse(200, { avatar: user.avatar }, "Avatar updated successfully")
+  );
+});
+
+export const deactivateAccount = asyncHandler(async (req, res) => {
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { isActive: false },
+    { new: true }
+);
+
+if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  
+  return res.status(200).json(
+      new ApiResponse(200, null, "Account deactivated successfully")
+    );
+});
+
 export const changePassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
@@ -408,61 +464,5 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, null, "Password changed successfully, please log in again")
-  );
-});
-
-export const logoutAllDevices = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  user.refreshTokens = []; // ✅ Clear all refresh tokens
-  await user.save();
-
-  // Clear cookies
-  const options = { httpOnly: true, secure: true, sameSite: "strict" };
-  res.clearCookie("refreshToken", options);
-  res.clearCookie("accessToken", options);
-
-  return res.status(200).json(
-    new ApiResponse(200, null, "Logged out from all devices successfully")
-  );
-});
-
-export const updateAvatar = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    throw new ApiError(400, "Avatar file is required");
-  }
-
-  const user = await User.findById(req.user._id);
-  if (!user) throw new ApiError(404, "User not found");
-
-  // Example: save to Cloudinary or local storage
-  user.avatar = {
-    url: `/uploads/${req.file.filename}`, 
-    localPath: req.file.path
-  };
-
-  await user.save();
-
-  return res.status(200).json(
-    new ApiResponse(200, { avatar: user.avatar }, "Avatar updated successfully")
-  );
-});
-
-export const deactivateAccount = asyncHandler(async (req, res) => {
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { isActive: false },
-    { new: true }
-  );
-
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  return res.status(200).json(
-    new ApiResponse(200, null, "Account deactivated successfully")
   );
 });

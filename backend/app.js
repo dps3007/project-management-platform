@@ -27,6 +27,15 @@ import errorHandler from "./middlewares/error.middleware.js";
 
 app.use("/api/v1/healthcheck", healthCheckRouter);
 app.use("/api/v1/auth", authRouter);
+
+
+//admin routes
+import adminRoutes from "./routes/admin.routes.js";
+
+app.use("/api/v1/admin", adminRoutes);
+
+
+
 app.use(errorHandler);
 
 
