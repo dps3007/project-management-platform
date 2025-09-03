@@ -1,47 +1,30 @@
 import mongoose, { Schema } from "mongoose";
 import { AvailableTaskStatuses, TaskStatusEnum } from "../utils/constants.js";
 
-const taskSchema = new Schema(
+const subtaskSchema = new Schema(
   {
     title: {
       type: String,
       required: true,
       trim: true,
     },
-    description: {
-      type: String,
-      default: "",
-    },
-    project: {
+    task: {
       type: Schema.Types.ObjectId,
-      ref: "Project",
+      ref: "Task",
       required: true,
     },
-    assignedTo: {
+    createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-    },
-    assignedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+      required: true,
     },
     status: {
       type: String,
       enum: AvailableTaskStatuses, // ["TODO", "IN_PROGRESS", "DONE"]
       default: TaskStatusEnum.TODO,
     },
-    attachments: {
-      type: [
-        {
-          url: String,
-          mimetype: String,
-          size: Number, // in bytes
-        },
-      ],
-      default: [],
-    },
   },
   { timestamps: true }
 );
 
-export const Task = mongoose.model("Task", taskSchema);
+export const Subtask = mongoose.model("Subtask", subtaskSchema);

@@ -1,105 +1,110 @@
-import mongoose, {Schema} from "mongoose";
-import brcypt from "bcrypt";
+import mongoose, { Schema } from "mongoose";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-
-const userSchema = new Schema({
+const userSchema = new Schema(
+  {
     avatar: {
-        type: {
-            url: String,
-            localPath: String,
-        },
-        default: {
-            url: 'https://placehold.co/200x200/png',
-            localPath: ''
-        },
+      type: {
+        url: { type: String, default: "https://placehold.co/200x200/png" },
+        localPath: { type: String, default: "" },
+      },
+      default: undefined,
     },
     email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true,
-        index: true,
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
     },
     username: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      unique: true, // 🔑 prevent duplicate usernames
+      trim: true,
+      index: true,
     },
     password: {
-        type: String,
-        required: [true, 'Password is required'],
+      type: String,
+      required: [true, "Password is required"],
+      minlength: 6,
+      select: false, // 🔑 don’t send password unless explicitly requested
     },
     isEmailVerified: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
     refreshTokens: {
-        type: [String],
-        default: []
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr) => arr.length <= 5, // optional: limit concurrent sessions
+        message: "Exceeded maximum number of active sessions",
+      },
     },
-    passwordResetToken: {
-        type: String,
-        default: null
-    },
-    passwordResetTokenExpiry: {
-        type: Date,
-        default: null
-    },
-    emailVerificationToken: {
-        type: String,
-        default: null
-    },
-    emailVerificationTokenExpiry: {
-        type: Date,
-        default: null
-    },
+    passwordResetToken: { type: String, default: null },
+    passwordResetTokenExpiry: { type: Date, default: null },
+    emailVerificationToken: { type: String, default: null },
+    emailVerificationTokenExpiry: { type: Date, default: null },
+
+    // 🌍 Global role (app-level, not per-project)
     role: {
-    type: String,
-    enum: ["user", "admin"],
-    default: "user",
+      type: String,
+      enum: ["user", "admin"], // keep global simple
+      default: "user",
+    },
   },
+  { timestamps: true }
+);
 
-}, { timestamps: true });
-
-
-// hash password with pre hook
+// 🔑 Hash password before saving
 userSchema.pre("save", async function (next) {
-    if (this.isModified("password")) {
-        // Hash the password before saving
-        this.password = await brcypt.hash(this.password, 10);
-    }
-    next();
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  next();
 });
 
-//methods
+// 🔑 Compare password
 userSchema.methods.isPasswordMatch = async function (password) {
-    return await brcypt.compare(password, this.password);
+  return bcrypt.compare(password, this.password);
 };
 
-//jwt
+// 🔑 Generate Access Token
 userSchema.methods.generateAccessToken = function () {
-    return jwt.sign({ _id: this._id ,
-        email: this.email,
-        username: this.username
-    }, process.env.ACCESS_TOKEN_SECRET, 
-    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+      username: this.username,
+      role: this.role, // include global role
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+  );
 };
 
+// 🔑 Generate Refresh Token
 userSchema.methods.generateRefreshToken = function () {
-    return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
+  return jwt.sign(
+    { _id: this._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
+  );
 };
 
-// crpyto
+// 🔑 Generate Temporary Token (reset / verify)
 userSchema.methods.generateTemporaryToken = function () {
-    const unhashedToken = crypto.randomBytes(20).toString('hex');
+  const unhashedToken = crypto.randomBytes(20).toString("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(unhashedToken)
+    .digest("hex");
+  const tokenExpiry = Date.now() + 20 * 60 * 1000; // 20 min
+  return { unhashedToken, hashedToken, tokenExpiry };
+};
 
-    const hashedToken = crypto.createHash('sha256').update(unhashedToken).digest('hex');
-
-    const tokenExpiry = Date.now() + 20 * 60 * 1000; // 20 minutes
-    return { unhashedToken, hashedToken, tokenExpiry };
-}
-
-export const User = mongoose.model('User', userSchema);
+export const User = mongoose.model("User", userSchema);
