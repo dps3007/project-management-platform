@@ -11,9 +11,9 @@ const router = express.Router();
 
 router.use(verifyJWT);
 
-router.get("/:noteId/comments", getNoteComments);
-router.post("/:noteId/comments", createNoteComment);
-router.put("/comments/:commentId", updateNoteComment);
-router.delete("/comments/:commentId", deleteNoteComment);
+router.get("/:noteId/", getNoteComments);
+router.post("/:noteId/", createNoteComment);
+router.put("/:commentId", updateNoteComment);
+router.delete("/:commentId", deleteNoteComment);
 
 export default router;
