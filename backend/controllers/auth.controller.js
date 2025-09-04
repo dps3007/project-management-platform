@@ -1,4 +1,4 @@
-import {User} from "../models/user.model.js";
+import { User } from "../models/user.model.js";
 import  ApiResponse  from "../utils/apiResponse.js";
 import ApiError from "../utils/apiError.js";
 import asyncHandler  from "../utils/asyncHandler.js";
@@ -123,7 +123,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     return res.status(200)
         .cookie("refreshToken", refreshToken, options)
         .cookie("accessToken", accessToken, options)
-        .json(new ApiResponse(200, { user: loggedInUser, accessToken }, "User logged in successfully"));
+        .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User logged in successfully"));
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
@@ -155,7 +155,6 @@ export const logoutUser = asyncHandler(async (req, res) => {
         new ApiResponse(200, null, "User logged out successfully")
     );
 });
-
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
 
@@ -286,42 +285,51 @@ export const resendVerificationEmail = asyncHandler(async (req, res) => {
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+  // Get refresh token from cookie or request body
+  const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+  if (!refreshToken) throw new ApiError(400, "Refresh token is required");
 
-  if (!refreshToken) {
-    throw new ApiError(400, "Refresh token is required");
+  // Verify the refresh token
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+  } catch (err) {
+    throw new ApiError(401, "Invalid or expired refresh token");
   }
 
-  // Verify
-  const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-  if (!decoded) {
-    throw new ApiError(401, "Invalid refresh token");
-  }
-
-  // Find user whose refreshTokens array contains this token
-  const user = await User.findOne({ 
-    _id: decoded.id, 
-    refreshTokens: refreshToken 
+  // Find the user whose refreshTokens array contains this token
+  const user = await User.findOne({
+    _id: decoded._id,           // make sure payload contains _id
+    refreshTokens: refreshToken // use hashed token if you hash tokens
   });
 
-  if (!user) {
-    throw new ApiError(404, "User not found or token not valid");
-  }
+  if (!user) throw new ApiError(404, "User not found or token not valid");
 
   // Generate new tokens
   const newAccessToken = user.generateAccessToken();
   const newRefreshToken = user.generateRefreshToken();
 
-  // Replace old refreshToken with new one
+  // Replace old refresh token with new one in DB
   user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
   user.refreshTokens.push(newRefreshToken);
-  await user.save();
+  await user.save({ validateBeforeSave: false });
+
+  // Optionally set refresh token as a secure httpOnly cookie
+  res.cookie("refreshToken", newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
 
   return res.status(200).json(
-    new ApiResponse(200, { accessToken: newAccessToken, refreshToken: newRefreshToken }, "Tokens refreshed successfully")
+    new ApiResponse(
+      200,
+      { accessToken: newAccessToken },
+      "Tokens refreshed successfully"
+    )
   );
 });
-
 
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
