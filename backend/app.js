@@ -47,7 +47,7 @@ app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/projects", projectRoutes);   // Projects + members
 app.use("/api/v1/tasks", taskRoutes);         // Tasks + subtasks
 app.use("/api/v1/notes", projectNoteRoutes);  // Project notes
-app.use("/api/v1/comments", commentRoutes);      // Note comments
+app.use("/api/v1/notes/comments", commentRoutes);      // Note comments
 
 // =======================
 // ❌ Error Handler

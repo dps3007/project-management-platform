@@ -1,8 +1,8 @@
-import { ProjectNote } from "../models/projectnote.models.js";
-import { ProjectNoteComment } from "../models/projectnotecomment.models.js";
-import { ApiResponse } from "../utils/api-response.js";
-import { ApiError } from "../utils/api-error.js";
-import { asyncHandler } from "../utils/async-handler.js";
+import { ProjectNote } from "../models/note.model.js";
+import { ProjectNoteComment } from "../models/projectnotecomment.model.js";
+import  ApiResponse  from "../utils/apiResponse.js";
+import  ApiError  from "../utils/apiError.js";
+import  asyncHandler  from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
 
 // 📌 Get comments for a note

@@ -22,6 +22,12 @@ const projectNoteCommentSchema = new Schema(
       ref: "ProjectNoteComment", // for threaded replies
       default: null,
     },
+    note: {
+      type: Schema.Types.ObjectId,
+      ref: "ProjectNote",
+      required: true,
+      index: true, // added index for faster queries
+    },
   },
   { timestamps: true }
 );

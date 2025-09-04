@@ -5,7 +5,7 @@ import {
   updateProjectNote,
   deleteProjectNote,
   togglePinNote,
-} from "../controllers/projectnote.controller.js";
+} from "../controllers/projectNotes.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/multer.middleware.js";
 
