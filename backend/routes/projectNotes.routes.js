@@ -15,10 +15,10 @@ const router = express.Router();
 
 router.use(verifyJWT);
 
-router.get("/:projectId/notes", getProjectNotes);
-router.post("/:projectId/notes", upload.array("attachments"),authorizeRoles(UserRolesEnum.ADMIN), createProjectNote);
-router.put("/notes/:noteId",authorizeRoles(UserRolesEnum.ADMIN), updateProjectNote);
-router.delete("/notes/:noteId",authorizeRoles(UserRolesEnum.ADMIN), deleteProjectNote);
-router.patch("/notes/:noteId/pin",authorizeRoles(UserRolesEnum.ADMIN), togglePinNote);
+router.post("/:projectId/", upload.array("attachments"),authorizeRoles(UserRolesEnum.ADMIN), createProjectNote);
+router.get("/:projectId/", getProjectNotes);
+router.put("/:projectId/:noteId",authorizeRoles(UserRolesEnum.ADMIN), updateProjectNote);
+router.delete("/:projectId/:noteId",authorizeRoles(UserRolesEnum.ADMIN), deleteProjectNote);
+router.patch("/:projectId/:noteId/pin",authorizeRoles(UserRolesEnum.ADMIN), togglePinNote);
 
 export default router;
