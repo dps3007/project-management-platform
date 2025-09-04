@@ -123,7 +123,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     return res.status(200)
         .cookie("refreshToken", refreshToken, options)
         .cookie("accessToken", accessToken, options)
-        .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User logged in successfully"));
+        .json(new ApiResponse(200, { user: loggedInUser, accessToken}, "User logged in successfully"));
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
@@ -266,17 +266,19 @@ export const resendVerificationEmail = asyncHandler(async (req, res) => {
   // Generate new verification token
   const verificationToken = user.generateEmailVerificationToken();
   user.lastVerificationEmailSentAt = Date.now();
-  await user.save();
+  await user.save({ validateBeforeSave: false });
+
+  // Generate verification URL
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${user.email}`;
+
+  // Generate Mailgen content
+  const mailgenContent = emailVerificationMailgenContent(user.username, verificationUrl);
 
   // Send verification email
-  const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${user.email}`;
-
   await sendEmail({
-    to: user.email,
+    email: user.email,           // ✅ must be 'email'
     subject: "Email Verification",
-    text: `Please verify your email by clicking the link: ${verifyUrl}`,
-    html: `<p>Please verify your email by clicking the link below:</p>
-           <a href="${verifyUrl}">${verifyUrl}</a>`
+    mailgenContent               // ✅ Mailgen content object
   });
 
   return res.status(200).json(
