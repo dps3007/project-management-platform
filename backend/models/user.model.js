@@ -107,4 +107,12 @@ userSchema.methods.generateTemporaryToken = function () {
   return { unhashedToken, hashedToken, tokenExpiry };
 };
 
+// Generate Email Verification Token
+userSchema.methods.generateEmailVerificationToken = function () {
+  const token = crypto.randomBytes(32).toString("hex"); // random 32-byte hex string
+  this.emailVerificationToken = token;
+  this.emailVerificationTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+  return token;
+};
+
 export const User = mongoose.model("User", userSchema);
