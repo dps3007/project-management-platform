@@ -35,8 +35,8 @@ export const getUserById = asyncHandler(async (req, res) => {
 });
 
 export const updateUserRole = asyncHandler(async (req, res) => {
-  const { role } = req.body;
-
+  const { role } = req.body || {};
+  
   if (!["user", "admin"].includes(role)) {
     throw new ApiError(400, "Invalid role");
   }
