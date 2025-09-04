@@ -9,9 +9,6 @@ import mongoose from "mongoose";
 import { AvailableRolesEnum, UserRolesEnum } from "../utils/constants.js";
 
 
-/**
- * Get all projects for logged-in user
- */
 const getProjects = asyncHandler(async (req, res) => {
   const projects = await ProjectMember.aggregate([
     {
@@ -58,9 +55,6 @@ const getProjects = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, projects, "Projects fetched successfully"));
 });
 
-/**
- * Get project by ID
- */
 const getProjectById = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
   const project = await Project.findById(projectId);
@@ -72,9 +66,6 @@ const getProjectById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, project, "Project fetched successfully"));
 });
 
-/**
- * Create new project
- */
 const createProject = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
 
@@ -95,9 +86,6 @@ const createProject = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, project, "Project created successfully"));
 });
 
-/**
- * Update project
- */
 const updateProject = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
   const { projectId } = req.params;
@@ -115,9 +103,7 @@ const updateProject = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, project, "Project updated successfully"));
 });
 
-/**
- * Delete project
- */
+
 const deleteProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
 
@@ -132,9 +118,7 @@ const deleteProject = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, project, "Project deleted successfully"));
 });
 
-/**
- * Add member
- */
+
 const addMembersToProject = asyncHandler(async (req, res) => {
   const { email, role } = req.body;
   const { projectId } = req.params;
@@ -153,9 +137,7 @@ const addMembersToProject = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, member, "Project member added successfully"));
 });
 
-/**
- * Get project members
- */
+
 const getProjectMembers = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
   const project = await Project.findById(projectId);
@@ -193,14 +175,12 @@ const getProjectMembers = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, projectMembers, "Project members fetched"));
 });
 
-/**
- * Update member role
- */
+
 const updateMemberRole = asyncHandler(async (req, res) => {
   const { projectId, userId } = req.params;
   const { newRole } = req.body;
 
-  if (!AvailableUserRole.includes(newRole)) {
+  if (!AvailableRolesEnum.includes(newRole)) {
     throw new ApiError(400, "Invalid role");
   }
 
@@ -217,9 +197,7 @@ const updateMemberRole = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, projectMember, "Member role updated successfully"));
 });
 
-/**
- * Delete member
- */
+
 const deleteMember = asyncHandler(async (req, res) => {
   const { projectId, userId } = req.params;
 
