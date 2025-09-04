@@ -15,7 +15,9 @@ export const generateAccessTokenAndRefreshToken = async (userId) => {
         const accessToken = user.generateAccessToken();
         const refreshToken = user.generateRefreshToken();
 
-        user.refreshToken = refreshToken;
+        // push to array for multiple sessions
+        user.refreshTokens.push(refreshToken);
+
         await user.save({validateBeforeSave: false});
 
         return { accessToken, refreshToken };
@@ -86,7 +88,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     }
 
     // 2. Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
         throw new ApiError(401, "Invalid credentials");
     }
@@ -102,7 +104,7 @@ export const loginUser = asyncHandler(async (req, res) => {
 
     // 5. Fetch user without sensitive fields
     const loggedInUser = await User.findById(user._id).select(
-        "-password -refreshToken -emailVerificationToken -emailVerificationTokenExpiry"
+        "-password -refreshToken -emailVerificationToken -emailVerificationTokenExpiry -refreshTokens"
     );
 
     if (!loggedInUser) {
@@ -121,30 +123,39 @@ export const loginUser = asyncHandler(async (req, res) => {
     return res.status(200)
         .cookie("refreshToken", refreshToken, options)
         .cookie("accessToken", accessToken, options)
-        .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User logged in successfully"));
+        .json(new ApiResponse(200, { user: loggedInUser, accessToken }, "User logged in successfully"));
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
-    // Remove refreshToken from DB (optional but recommended)
-    if (req.user?._id) {
-        await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } });
-    }
+    // Get refresh token from cookie or request body
+    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    if (!refreshToken) throw new ApiError(400, "Refresh token not provided");
 
-    // Options must match cookies set during login
-    const options = {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
-    };
+    // Make sure user is authenticated
+    if (!req.user?._id) throw new ApiError(401, "Unauthorized");
+
+    // Fetch user
+    const user = await User.findById(req.user._id);
+    if (!user) throw new ApiError(404, "User not found");
+
+    // Remove the specific refresh token from the array
+    user.refreshTokens = user.refreshTokens.filter(token => token !== refreshToken);
+    await user.save({ validateBeforeSave: false });
 
     // Clear cookies
-    res.clearCookie("refreshToken", options);
-    res.clearCookie("accessToken", options);
+    const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+    };
+    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("accessToken", cookieOptions);
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, null, "User logged out successfully"));
+    return res.status(200).json(
+        new ApiResponse(200, null, "User logged out successfully")
+    );
 });
+
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
 
