@@ -47,11 +47,11 @@ router.get("/me", verifyJWT, getCurrentUser);
 router.put("/me", verifyJWT, updateCurrentUser);
 router.delete("/me", verifyJWT, deleteCurrentUser);
 router.put("/me/avatar", verifyJWT, upload.single("avatar"), updateAvatar);
-router.put("/me/deactivate", verifyJWT, deactivateAccount);
+router.put("/me/deactivate", verifyJWT, deactivateAccount); // abhi check nhi kiya
 
 // ✅ Password routes
 router.post("/change-password", verifyJWT, changePasswordValidation(), validateRequest, changePassword);
-router.post("/forgot-password", forgotPasswordValidation(), validateRequest, forgotPassword);
+router.post("/forgot-password", forgotPasswordValidation(), validateRequest, forgotPasswordLimiter, forgotPassword); 
 router.post("/reset-password", resetPassword);
 
 export default router;

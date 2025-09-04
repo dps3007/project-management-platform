@@ -70,7 +70,10 @@ userSchema.pre("save", async function (next) {
 
 // 🔑 Compare password
 userSchema.methods.isPasswordMatch = async function (password) {
-  return bcrypt.compare(password, this.password);
+  // Prevent bcrypt error if password is missing
+  if (!password || !this.password) return false;
+
+  return await bcrypt.compare(password, this.password);
 };
 
 // 🔑 Generate Access Token
@@ -113,6 +116,21 @@ userSchema.methods.generateEmailVerificationToken = function () {
   this.emailVerificationToken = token;
   this.emailVerificationTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
   return token;
+};
+
+// Generate Password Reset Token
+userSchema.methods.generatePasswordResetToken = function () {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+
+  // Hash before storing in DB
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+
+  this.passwordResetTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+
+  return rawToken; // send the raw token in email
 };
 
 export const User = mongoose.model("User", userSchema);

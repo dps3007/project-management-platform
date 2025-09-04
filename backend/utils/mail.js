@@ -6,7 +6,7 @@ const mailGenerator = new Mailgen({
   theme: "default",
   product: {
     name: "Project Management",
-    link: process.env.FRONTEND_URL || "http://localhost:3000",
+    link: process.env.FRONTEND_URL || "http://localhost:8000",
   },
 });
 

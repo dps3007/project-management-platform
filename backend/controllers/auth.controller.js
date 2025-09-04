@@ -333,7 +333,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
   );
 });
 
-
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -347,19 +346,35 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   }
 
   // Generate password reset token
-  const resetToken = user.generatePasswordResetToken(); // 👈 custom method banaoge
+  const resetToken = user.generatePasswordResetToken();
   user.passwordResetToken = resetToken;
-  user.passwordResetTokenExpiry = Date.now() + 3600000; // 1 hour
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
-  // Send email
+  // Create reset URL
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${user.email}`;
 
+  // Build Mailgen content
+  const mailgenContent = {
+    body: {
+      name: user.username || user.email,
+      intro: "You requested a password reset.",
+      action: {
+        instructions: "Click the button below to reset your password:",
+        button: {
+          color: "#DC4D2F",
+          text: "Reset Password",
+          link: resetUrl,
+        },
+      },
+      outro: "If you did not request this, you can safely ignore this email.",
+    },
+  };
+
+  // Send email with correct keys
   await sendEmail({
-    to: user.email,
+    email: user.email,
     subject: "Password Reset",
-    html: `<p>Please reset your password by clicking the link below:</p>
-           <a href="${resetUrl}">${resetUrl}</a>`
+    mailgenContent,
   });
 
   return res.status(200).json(
@@ -394,7 +409,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
     new ApiResponse(200, null, "Password reset successful")
   );
 });
-
 
 export const logoutAllDevices = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
@@ -459,7 +473,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
-  const user = await User.findById(req.user._id);
+  const user = await User.findById(req.user._id).select("+password");
   if (!user) {
     throw new ApiError(404, "User not found");
   }
