@@ -3,7 +3,6 @@ import { ProjectNoteComment } from "../models/projectnotecomment.model.js";
 import  ApiResponse  from "../utils/apiResponse.js";
 import  ApiError  from "../utils/apiError.js";
 import  asyncHandler  from "../utils/asyncHandler.js";
-import mongoose from "mongoose";
 
 // 📌 Get comments for a note
 const getNoteComments = asyncHandler(async (req, res) => {
@@ -47,20 +46,19 @@ const updateNoteComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
   const { content } = req.body;
 
-  const comment = await ProjectNoteComment.findById(commentId);
-  if (!comment) throw new ApiError(404, "Comment not found");
+  const comment = await ProjectNoteComment.findOneAndUpdate(
+    { _id: commentId, createdBy: req.user._id },
+    { content },
+    { new: true }
+  );
 
-  if (!comment.createdBy.equals(req.user._id)) {
-    throw new ApiError(403, "You can only edit your own comments");
-  }
-
-  comment.content = content;
-  await comment.save();
+  if (!comment) throw new ApiError(404, "Comment not found or not yours");
 
   return res
     .status(200)
     .json(new ApiResponse(200, comment, "Comment updated successfully"));
 });
+
 
 // 📌 Delete comment
 const deleteNoteComment = asyncHandler(async (req, res) => {

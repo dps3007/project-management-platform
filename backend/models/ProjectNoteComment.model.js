@@ -6,6 +6,7 @@ const projectNoteCommentSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "ProjectNote",
       required: true,
+      index: true, // keep only one `note` field
     },
     content: {
       type: String,
@@ -21,12 +22,6 @@ const projectNoteCommentSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "ProjectNoteComment", // for threaded replies
       default: null,
-    },
-    note: {
-      type: Schema.Types.ObjectId,
-      ref: "ProjectNote",
-      required: true,
-      index: true, // added index for faster queries
     },
   },
   { timestamps: true }
