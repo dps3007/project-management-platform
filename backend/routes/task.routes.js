@@ -11,7 +11,6 @@ import {
   deleteSubTask,
   statusTracker,
   assignTask,
-  markSubtaskCompleted,
   addTaskAttachments
 } from "../controllers/task.controller.js";
 import { authorizeRoles } from "../middlewares/authorize.middleware.js";
@@ -34,25 +33,17 @@ router.put("/:projectId/tasks/:taskId", authorizeRoles(UserRolesEnum.ADMIN, User
 router.delete("/:projectId/tasks/:taskId", authorizeRoles(UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN), deleteTask);// Delete task
 router.get("/tasks/status/:userId", verifyJWT, statusTracker); // Get status tracker for a task
 router.post("/tasks/assign", authorizeRoles(UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN), assignTask); // Assign task to a user
-router.post(
-  "/tasks/:taskId/attachments",
-  verifyJWT,
-  upload.array("files", 10), // max 10 files per request
-  addTaskAttachments
-);
+// max 10 files per request
+router.post("/tasks/:taskId/attachments", verifyJWT, upload.array("files", 10), addTaskAttachments);
 
 // ==========================
 // 📂 SUBTASK CRUD
 // ==========================
-router.post("/:projectId/tasks/:taskId/subtasks", createSubTask);             // Create subtask
-router.put("/:projectId/tasks/:taskId/subtasks/:subtaskId", updateSubTask);   // Update subtask
-router.delete("/:projectId/tasks/:taskId/subtasks/:subtaskId",authorizeRoles(UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN), deleteSubTask);// Delete subtask
+router.post("/:projectId/subtasks/:taskId/", createSubTask);             // Create subtask
+router.put("/:projectId/subtasks/:taskId/:subtaskId", updateSubTask);   // Update subtask
 // PATCH to mark subtask as completed
-router.patch(
-  "/tasks/:taskId/subtasks/:subtaskId/complete",
-  verifyJWT,
-  markSubtaskCompleted
-);
+
+router.delete("/:projectId/subtasks/:taskId/:subtaskId",authorizeRoles(UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN), deleteSubTask);// Delete subtask
 
 
 export default router;

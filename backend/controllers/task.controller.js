@@ -211,34 +211,33 @@ const deleteSubTask = asyncHandler(async (req, res) => {
 const statusTracker = asyncHandler(async (req, res) => {
   const { userId } = req.params;
 
-  // Fetch tasks assigned to the user
   const tasks = await Task.find({ assignedTo: userId });
 
-  // Initialize status counts with all states
   const statusCounts = {
-    Todo: 0,
-    "In Progress": 0,
-    Done: 0,
+    todo: 0,
+    "in progress": 0,
+    done: 0,
   };
 
-  // Count tasks per status
   tasks.forEach((task) => {
-    if (statusCounts.hasOwnProperty(task.status)) {
-      statusCounts[task.status]++;
+    const key = task.status.toLowerCase(); // normalize
+    if (statusCounts.hasOwnProperty(key)) {
+      statusCounts[key]++;
     }
   });
 
-  return res.status(200).json(
-    new ApiResponse(200, statusCounts, "Task status tracked successfully")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, statusCounts, "Task status tracked successfully"));
 });
 
+
 const assignTask = asyncHandler(async (req, res) => {
-  const { title, description, assignedTo } = req.body;
+  const { title, description, assignedTo, projectId } = req.body;
 
   // Validate required fields
-  if (!title || !assignedTo) {
-    throw new ApiError(400, "Title and assignedTo are required");
+  if (!title || !assignedTo || !projectId) {
+    throw new ApiError(400, "Title, assignedTo and projectId are required");
   }
 
   // Validate assigned user
@@ -247,49 +246,24 @@ const assignTask = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
+  // Validate project
+  const project = await Project.findById(projectId);
+  if (!project) {
+    throw new ApiError(404, "Project not found");
+  }
+
   // Create the task
   const task = await Task.create({
     title,
     description: description || "",
     assignedTo: user._id,
-    status: "Todo", // default status
+    project: project._id,   // ✅ required field
+    status: "todo",         // matches schema
   });
 
-  return res.status(201).json(
-    new ApiResponse(201, task, "Task assigned successfully")
-  );
-});
-
-// Controller to mark a subtask as completed
-const markSubtaskCompleted = asyncHandler(async (req, res) => {
-  const { taskId, subtaskId } = req.params;
-  const { userId } = req.body; // ID of the member marking it done
-
-  if (!taskId || !subtaskId) {
-    throw new ApiError(400, "Task ID and Subtask ID are required");
-  }
-
-  // Find the task assigned to the user
-  const task = await Task.findOne({ _id: taskId, assignedTo: userId });
-  if (!task) {
-    throw new ApiError(404, "Task not found or not assigned to you");
-  }
-
-  // Find the subtask
-  const subtask = task.subtasks.id(subtaskId);
-  if (!subtask) {
-    throw new ApiError(404, "Subtask not found");
-  }
-
-  // Update status to Done
-  subtask.status = "Done";
-
-  // Save changes
-  await task.save();
-
-  return res.status(200).json(
-    new ApiResponse(200, subtask, "Subtask marked as completed successfully")
-  );
+  return res
+    .status(201)
+    .json(new ApiResponse(201, task, "Task assigned successfully"));
 });
 
 const addTaskAttachments = asyncHandler(async (req, res) => {
@@ -332,6 +306,5 @@ export {
   deleteSubTask,
   statusTracker,
   assignTask,
-  markSubtaskCompleted,
   addTaskAttachments
 };
